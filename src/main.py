@@ -1,17 +1,19 @@
+import argparse
 import os
 import datetime
 import numpy as np
+from pathlib import Path
 import pandas as pd
 
 from tqdm.notebook import tqdm
 from sklearn.model_selection import StratifiedKFold
 
-from util import *
-from params import *
+from util import seed_everything, count_parameters, save_model_weights
+from params import NUM_CLASSES, DATA_PATH, AUDIO_PATH, OUTPUT_PATH
 from logger import create_logger
 from data.dataset import BirdDataset
 from model_zoo.models import get_model
-from training.train import fit, predict
+from training.train import fit
 
 
 class AudioParams:
@@ -27,7 +29,7 @@ class AudioParams:
     fmax = 16000
 
 
-def train(config, df_train, df_val, fold):
+def train(config, df_train, df_val, fold, cp_folder):
     """
     Trains and validate a model
 
@@ -74,13 +76,13 @@ def train(config, df_train, df_val, fold):
         save_model_weights(
             model,
             f"{config.selected_model}_{config.name}_{fold}.pt",
-            cp_folder=CP_TODAY,
+            cp_folder=cp_folder,
         )
 
     return pred_val
 
 
-def k_fold(config, df, df_extra=None):
+def k_fold(config, df, fold):
     """
     Performs a k-fold cross validation
 
@@ -95,22 +97,25 @@ def k_fold(config, df, df_extra=None):
         np array -- Out-of-fold predictions
     """
 
-    skf = StratifiedKFold(n_splits=config.k, random_state=config.random_state)
-    splits = list(skf.split(X=df, y=df["ebird_code"]))
+    skf = StratifiedKFold(n_splits=config.k, shuffle=True, random_state=config.random_state)
+    splits = list(skf.split(X=df, y=df["primary_label"]))
 
     pred_oof = np.zeros((len(df), NUM_CLASSES))
 
+    # Checkpoints folder
+    TODAY = str(datetime.date.today())
+
     for i, (train_idx, val_idx) in enumerate(splits):
-        if i in config.selected_folds:
+        if i  == fold:
             print(f"\n-------------   Fold {i + 1} / {config.k}  -------------\n")
 
             df_train = df.iloc[train_idx].copy()
             df_val = df.iloc[val_idx].copy()
 
-            if df_extra is not None:
-                df_train = pd.concat((df_train, df_extra), 0).reset_index(drop=True)
+            CP_TODAY = OUTPUT_PATH / 'checkpoints'/ TODAY / str(i)
+            CP_TODAY.mkdir(parents=True, exist_ok=True)
 
-            pred_val = train(config, df_train, df_val, i)
+            pred_val = train(config, df_train, df_val, i, CP_TODAY)
             pred_oof[val_idx] = pred_val
 
     return pred_oof
@@ -121,7 +126,7 @@ class Config:
     Parameter used for training
     """
     # General
-    seed = 2020
+    seed = 42
     verbose = 1
     verbose_eval = 1
     epochs_eval_min = 25
@@ -130,7 +135,7 @@ class Config:
     # k-fold
     k = 5
     random_state = 42
-    selected_folds = [0]
+    selected_folds = [1]
 
     # Model
     selected_model = "resnest50_fast_1s1x64d"
@@ -138,11 +143,10 @@ class Config:
     # selected_model = 'resnext50_32x4d'
 
     use_conf = False
-    use_extra = False
 
     # Training
     batch_size = 64
-    epochs = 30 if use_extra else 40
+    epochs = 40
     lr = 1e-3
     warmup_prop = 0.05
     val_bs = 64
@@ -159,43 +163,20 @@ class Config:
 
 if __name__ == "__main__":
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--fold', '-f', required=True, type=int)
+    args = parser.parse_args()
+
     # Data
-
-    df_train = pd.read_csv(DATA_PATH + "train.csv")
-
-    paths = []
-    for c, file in df_train[["ebird_code", "filename"]].values:
-        path = f"{AUDIO_PATH}{c}/{file[:-4]}.wav"
-        paths.append(path)
-    df_train["file_path"] = paths
-
-    # Extra Data
-
-    df_extra = pd.read_csv(DATA_PATH + "train_extended.csv")
+    df_train = pd.read_csv(DATA_PATH / "train_metadata.csv")
 
     paths = []
-    for c, file in df_extra[["ebird_code", "filename"]].values:
-        path = f"{EXTRA_AUDIO_PATH}{c}/{file[:-4]}.wav"
-        paths.append(path)
-    df_extra["file_path"] = paths
-
-    # df_extra = df_extra[df_extra['duration'] < 200]  # remove long audios
-
-    if not Config.use_extra:
-        df_extra = None
-
-    # Checkpoints folder
-
-    TODAY = str(datetime.date.today())
-    CP_TODAY = f"../checkpoints/{TODAY}/"
-
-    if not os.path.exists(CP_TODAY):
-        os.mkdir(CP_TODAY)
+    df_train["file_path"] = [str(AUDIO_PATH / primary_label / filename) for primary_label, filename
+                             in zip(df_train.primary_label, df_train.filename) ]
 
     # Logger
-
-    create_logger("../output/", f"{TODAY}_{Config.selected_model}_{Config.name}")
+    TODAY = str(datetime.date.today())
+    create_logger(str(OUTPUT_PATH), f"{TODAY}_{Config.selected_model}_{Config.name}")
 
     # Training
-
-    pred_oof = k_fold(Config, df_train, df_extra=df_extra)
+    pred_oof = k_fold(Config, df_train, args.fold)

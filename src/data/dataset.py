@@ -1,16 +1,18 @@
 import os
+
 import pickle
 import librosa
 import soundfile
 import numpy as np
 from torch.utils.data import Dataset
 
-from data.transforms import *
-from params import MEAN, STD, CLASSES
+#from data.transforms import *
+from data.transforms import get_wav_transforms, crop_or_pad, mono_to_color, normalize
+from params import MEAN, STD, CLASSES, OUTPUT_PATH
 
 
 ONE_HOT = np.eye(len(CLASSES))
-CONF_PATH = "../output/preds_oof.pkl"
+CONF_PATH = OUTPUT_PATH / "preds_oof.pkl"
 
 
 def compute_melspec(y, params):
@@ -54,7 +56,7 @@ class BirdDataset(Dataset):
 
         self.wav_transfos = get_wav_transforms() if train else None
 
-        self.y = np.array([CLASSES.index(c) for c in df["ebird_code"]])
+        self.y = np.array([CLASSES.index(c) for c in df["primary_label"]])
         self.paths = df["file_path"].values
 
         self.sample_len = params.duration * params.sr

@@ -3,10 +3,10 @@ import time
 import torch
 import numpy as np
 import torch.nn as nn
-
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from transformers import get_linear_schedule_with_warmup
+from tqdm import tqdm
 
 from util import f1
 from params import NUM_WORKERS, NUM_CLASSES
@@ -103,7 +103,7 @@ def fit(
         optimizer, num_warmup_steps, num_training_steps
     )
 
-    for epoch in range(epochs):
+    for epoch in tqdm(list(range(epochs))):
         model.train()
         start_time = time.time()
         optimizer.zero_grad()

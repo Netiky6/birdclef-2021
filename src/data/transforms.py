@@ -1,7 +1,7 @@
 # import cv2
 import pysndfx
 import numpy as np
-from audiomentations import *
+from audiomentations import Compose, AddGaussianSNR, AddBackgroundNoise
 from params import BACKGROUND_PATH
 
 
@@ -104,9 +104,7 @@ def get_wav_transforms():
     transforms = Compose(
         [
             AddGaussianSNR(max_SNR=0.5, p=0.5),
-            AddBackgroundNoise(
-                sounds_path=BACKGROUND_PATH, min_snr_in_db=0, max_snr_in_db=2, p=0.5
-            ),
+            AddBackgroundNoise(sounds_path=str(BACKGROUND_PATH), min_snr_in_db=0, max_snr_in_db=2, p=0.5),
         ]
     )
     return transforms
