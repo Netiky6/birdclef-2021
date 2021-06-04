@@ -1,12 +1,8 @@
 import torch
-import torchvision
 import torch.nn as nn
-import pretrainedmodels
-import resnest.torch as resnest_torch
+# import resnest.torch as resnest_torch
 
 from efficientnet_pytorch import EfficientNet
-
-from params import DEVICE, resnest50_path
 
 
 def get_model(name, num_classes=1):
@@ -24,8 +20,8 @@ def get_model(name, num_classes=1):
         torch model -- Pretrained model
     """
     if "resnest" in name:
-        #model = getattr(resnest_torch, name)(pretrained=True)
-        #model = torch.load(resnest50_path)
+        # model = getattr(resnest_torch, name)(pretrained=True)
+        # model = torch.load(resnest50_path)
         model = torch.hub.load('zhanghang1989/ResNeSt', 'resnest50', pretrained=True)
     elif "wsl" in name:
         model = torch.hub.load("facebookresearch/WSL-Images", name)

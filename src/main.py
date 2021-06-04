@@ -1,11 +1,8 @@
 import argparse
-import os
 import datetime
 import numpy as np
-from pathlib import Path
 import pandas as pd
 
-from tqdm.notebook import tqdm
 from sklearn.model_selection import StratifiedKFold
 
 from util import seed_everything, count_parameters, save_model_weights
@@ -106,13 +103,13 @@ def k_fold(config, df, fold):
     TODAY = str(datetime.date.today())
 
     for i, (train_idx, val_idx) in enumerate(splits):
-        if i  == fold:
+        if i == fold:
             print(f"\n-------------   Fold {i + 1} / {config.k}  -------------\n")
 
             df_train = df.iloc[train_idx].copy()
             df_val = df.iloc[val_idx].copy()
 
-            CP_TODAY = OUTPUT_PATH / 'checkpoints'/ TODAY / str(i)
+            CP_TODAY = OUTPUT_PATH / 'checkpoints' / TODAY / str(i)
             CP_TODAY.mkdir(parents=True, exist_ok=True)
 
             pred_val = train(config, df_train, df_val, i, CP_TODAY)
@@ -135,7 +132,6 @@ class Config:
     # k-fold
     k = 5
     random_state = 42
-    selected_folds = [1]
 
     # Model
     selected_model = "resnest50_fast_1s1x64d"
@@ -170,9 +166,8 @@ if __name__ == "__main__":
     # Data
     df_train = pd.read_csv(DATA_PATH / "train_metadata.csv")
 
-    paths = []
     df_train["file_path"] = [str(AUDIO_PATH / primary_label / filename) for primary_label, filename
-                             in zip(df_train.primary_label, df_train.filename) ]
+                             in zip(df_train.primary_label, df_train.filename)]
 
     # Logger
     TODAY = str(datetime.date.today())
